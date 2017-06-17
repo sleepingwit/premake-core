@@ -4,9 +4,10 @@
 -- Copyright (c) 2010-2013 Jason Perkins and the Premake project
 --
 
+	local p = premake
 	local suite = test.declare("make_pch")
-	local make = premake.make
-	local project = premake.project
+	local make = p.make
+	local project = p.project
 
 
 
@@ -95,6 +96,11 @@ ifneq (,$(PCH))
 $(OBJECTS): $(GCH) $(PCH)
 $(GCH): $(PCH)
 	@echo $(notdir $<)
+ifeq (posix,$(SHELLTYPE))
+	$(SILENT) mkdir -p $(OBJDIR)
+else
+	$(SILENT) mkdir $(subst /,\\,$(OBJDIR))
+endif
 	$(SILENT) $(CXX) -x c++-header $(ALL_CXXFLAGS) -o "$@" -MF "$(@:%.gch=%.d)" -c "$<"
 endif
 		]]
@@ -114,6 +120,11 @@ ifneq (,$(PCH))
 $(OBJECTS): $(GCH) $(PCH)
 $(GCH): $(PCH)
 	@echo $(notdir $<)
+ifeq (posix,$(SHELLTYPE))
+	$(SILENT) mkdir -p $(OBJDIR)
+else
+	$(SILENT) mkdir $(subst /,\\,$(OBJDIR))
+endif
 	$(SILENT) $(CC) -x c-header $(ALL_CFLAGS) -o "$@" -MF "$(@:%.gch=%.d)" -c "$<"
 endif
 		]]
