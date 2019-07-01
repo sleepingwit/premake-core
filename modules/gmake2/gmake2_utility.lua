@@ -32,6 +32,7 @@
 			gmake2.shellType,
 			utility.initialize,
 			utility.createFileTable,
+			utility.outputConfigurationSection,
 			utility.outputFilesSection,
 			utility.outputRulesSection,
 			utility.outputFileRuleSection,
@@ -174,7 +175,8 @@
 			local environ = table.shallowcopy(filecfg.environ)
 
 			if rule.propertydefinition then
-				p.rule.prepareEnvironment(rule, environ, "$(%s)")
+				gmake2.prepareEnvironment(rule, environ, cfg)
+				gmake2.prepareEnvironment(rule, environ, filecfg)
 			end
 
 			local shadowContext = p.context.extent(rule, environ)
@@ -209,7 +211,8 @@
 
 	utility.elements.configuration = function(cfg)
 		return {
-			utility.ruleProperties,
+			utility.bindirs,
+			utility.exepaths,
 			gmake2.settings,
 			gmake2.preBuildCmds,
 			gmake2.preLinkCmds,
@@ -218,29 +221,28 @@
 	end
 
 
-	function utility.ruleProperties(cfg, toolset)
-		for i = 1, #cfg.rules do
-			local rule = p.global.getRule(cfg.rules[i])
+	function utility.outputConfigurationSection(prj)
+		_p('# Configurations')
+		_p('# #############################################')
+		_p('')
+		gmake2.outputSection(prj, utility.elements.configuration)
+	end
 
-			for prop in p.rule.eachProperty(rule) do
-				local fld = p.rule.getPropertyField(rule, prop)
-				local value = cfg[fld.name]
-				if value ~= nil then
-					if fld.kind == "path" then
-						value = gmake2.path(cfg, value)
-					elseif fld.kind == "list:path" then
-						value = gmake2.path(cfg, value)
-					end
 
-					value = p.rule.expandString(rule, prop, value)
-					if value ~= nil and #value > 0 then
-						p.outln(prop.name .. ' = ' .. p.esc(value))
-					end
-				end
-			end
+	function utility.bindirs(cfg, toolset)
+		local dirs = project.getrelative(cfg.project, cfg.bindirs)
+		if #dirs > 0 then
+			p.outln('EXECUTABLE_PATHS = "' .. table.concat(dirs, ":") .. '"')
 		end
 	end
 
+
+	function utility.exepaths(cfg, toolset)
+		local dirs = project.getrelative(cfg.project, cfg.bindirs)
+		if #dirs > 0 then
+			p.outln('EXE_PATHS = PATH=$(EXECUTABLE_PATHS):$$PATH;')
+		end
+	end
 
 
 --
@@ -289,8 +291,6 @@
 			utility.targetRules,
 			gmake2.targetDirRules,
 			utility.cleanRules,
-			gmake2.preBuildRules,
-			gmake2.preLinkRules,
 		}
 	end
 
@@ -304,7 +304,7 @@
 
 
 	function utility.allRules(cfg, toolset)
-		local allTargets = 'all: $(TARGETDIR) prebuild prelink $(TARGET)'
+		local allTargets = 'all: $(TARGETDIR) $(TARGET)'
 		for _, kind in ipairs(cfg._gmake.kinds) do
 			allTargets = allTargets .. ' $(' .. kind .. ')'
 		end
@@ -322,6 +322,8 @@
 		end
 
 		_p('$(TARGET): %s', targets)
+		_p('\t$(PREBUILDCMDS)')
+		_p('\t$(PRELINKCMDS)')
 		_p('\t$(POSTBUILDCMDS)')
 		_p('')
 	end
@@ -360,7 +362,7 @@
 	function utility.outputFileRules(cfg, file)
 		local outputs = table.concat(file.buildoutputs, ' ')
 
-		local dependencies = file.source
+		local dependencies = p.esc(file.source)
 		if file.buildinputs and #file.buildinputs > 0 then
 			dependencies = dependencies .. " " .. table.concat(p.esc(file.buildinputs), " ")
 		end
@@ -374,7 +376,11 @@
 		if file.buildcommands then
 			local cmds = os.translateCommandsAndPaths(file.buildcommands, cfg.project.basedir, cfg.project.location)
 			for _, cmd in ipairs(cmds) do
-				_p('\t$(SILENT) %s', cmd)
+				if cfg.bindirs and #cfg.bindirs > 0 then
+					_p('\t$(SILENT) $(EXE_PATHS) %s', cmd)
+				else
+					_p('\t$(SILENT) %s', cmd)
+				end
 			end
 		end
 	end

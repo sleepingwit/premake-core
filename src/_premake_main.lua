@@ -41,7 +41,11 @@
 ---
 
 	function m.installModuleLoader()
-		table.insert(package.loaders, 2, m.moduleLoader)
+		if not os.ishost('windows') then
+			local premakeDir = path.getdirectory(_PREMAKE_COMMAND)
+			package.cpath = package.cpath .. ';' .. premakeDir .. '/?.so'
+		end
+		table.insert(package.searchers, 2, m.moduleLoader)
 	end
 
 	function m.moduleLoader(name)
@@ -250,6 +254,21 @@
 		end
 	end
 
+---
+-- Start up MobDebug and try to hook up with ZeroBrane
+---
+
+	function m.tryHookDebugger()
+
+		if (_OPTIONS["debugger"]) then
+			print("Loading luasocket...")
+			require('luasocket')
+			print("Starting debugger...")
+			local mobdebug = require('mobdebug')
+			mobdebug.start()
+
+		end
+	end
 
 ---
 -- Override point, for logic that should run before baking.
@@ -350,6 +369,7 @@
 --
 
 	m.elements = {
+		m.tryHookDebugger,
 		m.installModuleLoader,
 		m.locateUserScript,
 		m.prepareEnvironment,

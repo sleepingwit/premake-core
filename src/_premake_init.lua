@@ -27,6 +27,7 @@
 			p.X86,
 			p.X86_64,
 			p.ARM,
+			p.ARM64,
 		},
 		aliases = {
 			i386  = p.X86,
@@ -57,17 +58,6 @@
 		name = "buildaction",
 		scope = "config",
 		kind = "string",
-		allowed = {
-			"Application",
-			"Compile",
-			"Component",
-			"Copy",
-			"Embed",
-			"Form",
-			"None",
-			"Resource",
-			"UserControl",
-		},
 	}
 
 	api.register {
@@ -121,7 +111,7 @@
 		scope = { "config", "rule" },
 		kind = "list:path",
 		tokens = true,
-		pathVars = true,
+		pathVars = false,
 	}
 
 	api.register {
@@ -129,7 +119,7 @@
 		scope = "config",
 		kind = "list:path",
 		tokens = true,
-		pathVars = true,
+		pathVars = false,
 	}
 
 	api.register {
@@ -202,13 +192,6 @@
 	}
 
 	api.register {
-		name = "configfile",
-		scope = "config",
-		kind = "string",
-		tokens = true,
-	}
-
-	api.register {
 		name = "configurations",
 		scope = "project",
 		kind = "list:string",
@@ -272,7 +255,10 @@
 		scope = "config",
 		kind = "string",
 		allowed = {
+			"Default",
 			"c7",
+			"Dwarf",
+			"SplitDwarf",
 		},
 	}
 
@@ -369,13 +355,6 @@
 	}
 
 	api.register {
-		name = "deploymentoptions",
-		scope = "config",
-		kind = "list:string",
-		tokens = true,
-	}
-
-	api.register {
 		name = "disablewarnings",
 		scope = "config",
 		kind = "list:string",
@@ -386,6 +365,18 @@
 		name = "display",
 		scope = "rule",
 		kind = "string",
+	}
+
+	api.register {
+		name = "dpiawareness",
+		scope = "config",
+		kind = "string",
+		allowed = {
+			"Default",
+			"None",
+			"High",
+			"HighPerMonitor",
+		}
 	}
 
 	api.register {
@@ -407,7 +398,8 @@
 			"Default",
 			"On",
 			"Off",
-			"SEH"
+			"SEH",
+			"CThrow",
 		},
 	}
 
@@ -493,7 +485,7 @@
 			"No64BitChecks",
 			"NoCopyLocal",
 			"NoEditAndContinue",   -- DEPRECATED
-			"NoFramePointer",
+			"NoFramePointer",      -- DEPRECATED
 			"NoImplicitLink",
 			"NoImportLib",
 			"NoIncrementalLink",
@@ -511,7 +503,7 @@
 			"RelativeLinks",
 			"ReleaseRuntime",      -- DEPRECATED
 			"ShadowedVariables",
-			"StaticRuntime",
+			"StaticRuntime",       -- DEPRECATED
 			"Symbols",             -- DEPRECATED
 			"UndefinedIdentifiers",
 			"WinMain",             -- DEPRECATED
@@ -597,6 +589,12 @@
 
 	api.register {
 		name = "dotnetframework",
+		scope = "config",
+		kind = "string",
+	}
+
+	api.register {
+		name = "csversion",
 		scope = "config",
 		kind = "string",
 	}
@@ -707,13 +705,25 @@
 	}
 
 	api.register {
+		name = "sharedlibtype",
+		scope = "project",
+		kind = "string",
+		allowed = {
+			"OSXBundle",
+			"OSXFramework",
+			"XCTest",
+		},
+	}
+
+	api.register {
 		name = "language",
 		scope = "project",
 		kind = "string",
 		allowed = {
 			"C",
 			"C++",
-			"C#"
+			"C#",
+			"F#"
 		}
 	}
 
@@ -740,13 +750,20 @@
 		kind = "string",
 		allowed = {
 			"Default",
+			"C++latest",
 			"C++98",
+			"C++0x",
 			"C++11",
+			"C++1y",
 			"C++14",
+			"C++1z",
 			"C++17",
 			"gnu++98",
+			"gnu++0x",
 			"gnu++11",
+			"gnu++1y",
 			"gnu++14",
+			"gnu++1z",
 			"gnu++17",
 		}
 	}
@@ -836,7 +853,7 @@
 
 	api.register {
 		name = "nuget",
-		scope = "project",
+		scope = "config",
 		kind = "list:string",
 		tokens = true,
 	}
@@ -1002,6 +1019,16 @@
 	}
 
 	api.register {
+		name = "resourcegenerator",
+		scope = "project",
+		kind = "string",
+        allowed = {
+            "internal",
+            "public"
+        }
+	}
+
+	api.register {
 		name = "rtti",
 		scope = "config",
 		kind = "string",
@@ -1023,6 +1050,17 @@
 		scope = "workspace",
 		kind = "string",
 		tokens = true,
+	}
+
+	api.register {
+		name = "staticruntime",
+		scope = "config",
+		kind = "string",
+		allowed = {
+			"Default",
+			"On",
+			"Off"
+		}
 	}
 
 	api.register {
@@ -1085,18 +1123,18 @@
 			"aix",
 			"bsd",
 			"haiku",
+			"ios",
 			"linux",
 			"macosx",
 			"solaris",
 			"wii",
 			"windows",
-			"xbox360",
 		},
 	}
 
 	api.register {
 		name = "systemversion",
-		scope = "project",
+		scope = "config",
 		kind = "string",
 	}
 
@@ -1104,6 +1142,12 @@
 		name = "tags",
 		scope = "config",
 		kind = "list:string",
+	}
+
+	api.register {
+		name = "tailcalls",
+		scope = "config",
+		kind = "boolean"
 	}
 
 	api.register {
@@ -1149,7 +1193,9 @@
 			value = value:lower()
 			local tool, version = p.tools.canonical(value)
 			if tool then
-				return value
+				return p.tools.normalize(value)
+			else
+				return nil
 			end
 		end,
 	}
@@ -1214,6 +1260,25 @@
 	}
 
 	api.register {
+		name = "isaextensions",
+		scope = "config",
+		kind = "list:string",
+		allowed = {
+			"MOVBE",
+			"POPCNT",
+			"PCLMUL",
+			"LZCNT",
+			"BMI",
+			"BMI2",
+			"F16C",
+			"AES",
+			"FMA",
+			"FMA4",
+			"RDRND",
+		}
+	}
+
+	api.register {
 		name = "vpaths",
 		scope = "project",
 		kind = "list:keyed:list:path",
@@ -1228,6 +1293,7 @@
 		allowed = {
 			"Off",
 			"Default",
+			"High",
 			"Extra",
 		}
 	}
@@ -1244,6 +1310,69 @@
 		kind = "boolean",
 	}
 
+	api.register {
+		name = "preferredtoolarchitecture",
+		scope = "workspace",
+		kind = "string",
+		allowed = {
+			"Default",
+			p.X86,
+			p.X86_64,
+		}
+	}
+
+	api.register {
+		name = "unsignedchar",
+		scope = "config",
+		kind = "boolean",
+	}
+
+	p.api.register {
+		name = "structmemberalign",
+		scope = "config",
+		kind = "integer",
+		allowed = {
+			"1",
+			"2",
+			"4",
+			"8",
+			"16",
+		}
+	}
+
+	api.register {
+		name = "omitframepointer",
+		scope = "config",
+		kind = "string",
+		allowed = {
+			"Default",
+			"On",
+			"Off"
+		}
+	}
+
+	api.register {
+		name = "visibility",
+		scope = "config",
+		kind = "string",
+		allowed = {
+			"Default",
+			"Hidden",
+			"Internal",
+			"Protected"
+		}
+	}
+
+	api.register {
+		name = "inlinesvisibility",
+		scope = "config",
+		kind = "string",
+		allowed = {
+			"Default",
+			"Hidden"
+		}
+	}
+
 -----------------------------------------------------------------------------
 --
 -- Field name aliases for backward compatibility
@@ -1255,7 +1384,6 @@
 	api.alias("buildmessage", "buildMessage")
 	api.alias("buildoutputs", "buildOutputs")
 	api.alias("cleanextensions", "cleanExtensions")
-	api.alias("configfile", "configFile")
 	api.alias("dotnetframework", "framework")
 	api.alias("editandcontinue", "editAndContinue")
 	api.alias("fileextension", "fileExtension")
@@ -1475,6 +1603,26 @@
 		entrypoint "mainCRTStartup"
 	end)
 
+	-- 31 October 2017
+
+	api.deprecateValue("flags", "StaticRuntime", 'Use `staticruntime "On"` instead',
+	function(value)
+		staticruntime "On"
+	end,
+	function(value)
+		staticruntime "Default"
+	end)
+
+	-- 08 April 2018
+
+	api.deprecateValue("flags", "NoFramePointer", 'Use `omitframepointer "On"` instead.',
+	function(value)
+		omitframepointer("On")
+	end,
+	function(value)
+		omitframepointer("Default")
+	end)
+
 -----------------------------------------------------------------------------
 --
 -- Install Premake's default set of command line arguments.
@@ -1483,6 +1631,7 @@
 
 	newoption
 	{
+		category	= "compilers",
 		trigger     = "cc",
 		value       = "VALUE",
 		description = "Choose a C/C++ compiler set",
@@ -1494,6 +1643,7 @@
 
 	newoption
 	{
+		category	= "compilers",
 		trigger     = "dotnet",
 		value       = "VALUE",
 		description = "Choose a .NET compiler set",
@@ -1508,6 +1658,12 @@
 	{
 		trigger     = "fatal",
 		description = "Treat warnings from project scripts as errors"
+	}
+
+    newoption
+	{
+		trigger     = "debugger",
+		description = "Start MobDebug remote debugger. Works with ZeroBrane Studio"
 	}
 
 	newoption
@@ -1545,6 +1701,7 @@
 			{ "bsd",      "OpenBSD, NetBSD, or FreeBSD" },
 			{ "haiku",    "Haiku" },
 			{ "hurd",     "GNU/Hurd" },
+			{ "ios",      "iOS" },
 			{ "linux",    "Linux" },
 			{ "macosx",   "Apple Mac OS X" },
 			{ "solaris",  "Solaris" },
@@ -1571,6 +1728,13 @@
 		trigger     = "version",
 		description = "Display version information"
 	}
+
+	if http ~= nil then
+		newoption {
+			trigger = "insecure",
+			description = "forfit SSH certification checks."
+		}
+	end
 
 
 -----------------------------------------------------------------------------
@@ -1604,27 +1768,39 @@
 
 	-- Add variations for other Posix-like systems.
 
-	filter { "system:MacOSX", "kind:SharedLib" }
+	filter { "system:darwin", "kind:WindowedApp" }
+		targetextension ".app"
+
+	filter { "system:darwin", "kind:SharedLib" }
 		targetextension ".dylib"
+
+	filter { "system:darwin", "kind:SharedLib", "sharedlibtype:OSXBundle" }
+		targetprefix ""
+		targetextension ".bundle"
+
+	filter { "system:darwin", "kind:SharedLib", "sharedlibtype:OSXFramework" }
+		targetprefix ""
+		targetextension ".framework"
+
+	filter { "system:darwin", "kind:SharedLib", "sharedlibtype:XCTest" }
+		targetprefix ""
+		targetextension ".xctest"
 
 	-- Windows and friends.
 
-	filter { "system:Windows or language:C#", "kind:ConsoleApp or WindowedApp" }
+	filter { "system:Windows or language:C# or language:F#", "kind:ConsoleApp or WindowedApp" }
 		targetextension ".exe"
 
-	filter { "system:Xbox360", "kind:ConsoleApp or WindowedApp" }
-		targetextension ".exe"
-
-	filter { "system:Windows or Xbox360", "kind:SharedLib" }
+	filter { "system:Windows", "kind:SharedLib" }
 		targetprefix ""
 		targetextension ".dll"
 		implibextension ".lib"
 
-	filter { "system:Windows or Xbox360", "kind:StaticLib" }
+	filter { "system:Windows", "kind:StaticLib" }
 		targetprefix ""
 		targetextension ".lib"
 
-	filter { "language:C#", "kind:SharedLib" }
+	filter { "language:C# or language:F#", "kind:SharedLib" }
 		targetprefix ""
 		targetextension ".dll"
 		implibextension ".dll"
@@ -1632,7 +1808,10 @@
 	filter { "kind:SharedLib", "system:not Windows" }
 		pic "On"
 
-	filter { "system:macosx" }
+	filter { "system:darwin" }
 		toolset "clang"
+
+	filter { "platforms:Win64" }
+		architecture "x86_64"
 
 	filter {}

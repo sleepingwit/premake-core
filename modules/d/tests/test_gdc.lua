@@ -50,7 +50,7 @@
 	end
 
 	function suite.dmd_target_separateCompilation()
-		flags { "SeparateCompilation" }
+		compilationmodel "File"
 		prepare_cfg({ m.make.target })
 		test.capture [[
   OUTPUTFLAG = -o "$@"
@@ -76,7 +76,7 @@
 	end
 
 	function suite.dmd_imports()
-		includedirs { "dir1", "dir2/" }
+		importdirs { "dir1", "dir2/" }
 		prepare_cfg({ m.make.imports })
 		test.capture [[
   IMPORTS += -Idir1 -Idir2
@@ -86,7 +86,7 @@
 	function suite.dmd_dFlags()
 		prepare_cfg({ m.make.dFlags })
 		test.capture [[
-  ALL_DFLAGS += $(DFLAGS) -frelease $(VERSIONS) $(DEBUG) $(IMPORTS) $(ARCH)
+  ALL_DFLAGS += $(DFLAGS) -frelease $(VERSIONS) $(DEBUG) $(IMPORTS) $(STRINGIMPORTS) $(ARCH)
 		]]
 	end
 
@@ -98,7 +98,7 @@
 	end
 
 	function suite.dmd_linkCmd_separateCompilation()
-		flags { "SeparateCompilation" }
+		compilationmodel "File"
 		prepare_cfg({ m.make.linkCmd })
 		test.capture [[
   LINKCMD = $(DC) -o $(TARGET) $(ALL_LDFLAGS) $(LIBS) $(OBJECTS)

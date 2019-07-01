@@ -59,8 +59,11 @@
 		},
 		pic = gcc.shared.pic,
 		vectorextensions = gcc.shared.vectorextensions,
+		isaextensions = gcc.shared.isaextensions,
 		warnings = gcc.shared.warnings,
-		symbols = gcc.shared.symbols
+		symbols = gcc.shared.symbols,
+		unsignedchar = gcc.shared.unsignedchar,
+		omitframepointer = gcc.shared.omitframepointer
 	}
 
 	clang.cflags = table.merge(gcc.cflags, {
@@ -176,6 +179,13 @@
 	clang.getrunpathdirs = gcc.getrunpathdirs
 
 --
+-- get the right output flag.
+--
+	function clang.getsharedlibarg(cfg)
+		return gcc.getsharedlibarg(cfg)
+	end
+
+--
 -- Build a list of linker flags corresponding to the settings in
 -- a particular project configuration.
 --
@@ -195,12 +205,12 @@
 		},
 		kind = {
 			SharedLib = function(cfg)
-				local r = { iif(cfg.system == p.MACOSX, "-dynamiclib", "-shared") }
+				local r = { clang.getsharedlibarg(cfg) }
 				if cfg.system == "windows" and not cfg.flags.NoImportLib then
 					table.insert(r, '-Wl,--out-implib="' .. cfg.linktarget.relpath .. '"')
 				elseif cfg.system == p.LINUX then
 					table.insert(r, '-Wl,-soname=' .. p.quoted(cfg.linktarget.name))
-				elseif cfg.system == p.MACOSX then
+				elseif table.contains(os.getSystemTags(cfg.system), "darwin") then
 					table.insert(r, '-Wl,-install_name,' .. p.quoted('@rpath/' .. cfg.linktarget.name))
 				end
 				return r

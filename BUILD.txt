@@ -18,7 +18,7 @@ BUILDING FROM A SOURCE PACKAGE
  officially supported toolsets in the build/ folder. Build the release
  configuration and you will be ready to go. For makefiles:
 
-    $ cd build/gmake.unix
+    $ cd build/gmake2.unix
     $ make config=release
 
  The binaries will be placed in the ./bin/release directory.
@@ -29,8 +29,6 @@ BUILDING FROM THE REPOSITORY
  If you have pulled sources from the Premake source repository, you can
  use `Bootstrap.mak` to generate your first premake executable:
 
-    $ git submodule init
-    $ git submodule update
     $ make -f Bootstrap.mak PLATFORM
 
  Where PLATFORM can be osx or linux.
@@ -56,7 +54,7 @@ BUILDING FROM THE REPOSITORY
  files for your toolset by running a command like the following in the
  top-level Premake directory:
 
-    $ premake5 gmake  # for makefiles
+    $ premake5 gmake2  # for makefiles
     $ premake5 vs2012 # for a Visual Studio 2012 solution
     $ premake --help  # to see a list of supported toolsets
 

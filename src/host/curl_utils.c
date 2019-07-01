@@ -1,7 +1,7 @@
-/**
+﻿/**
 * \file   curl_utils.c
 * \brief  curl utilities for the http library.
-* \author Copyright (c) 2017 Tom van Dijck, Jo�o Matos and the Premake project
+* \author Copyright (c) 2017 Tom van Dijck, João Matos and the Premake project
 */
 #ifdef PREMAKE_CURL
 
@@ -22,7 +22,11 @@ int curlProgressCallback(curl_state* state, double dltotal, double dlnow, double
 	lua_rawgeti(L, LUA_REGISTRYINDEX, state->RefIndex);
 	lua_pushnumber(L, (lua_Number)dltotal);
 	lua_pushnumber(L, (lua_Number)dlnow);
-	lua_pcall(L, 2, LUA_MULTRET, 0);
+	int ret = premake_pcall(L, 2, LUA_MULTRET);
+	if (ret != LUA_OK) {
+		printLastError(L);
+		return -1; // abort download
+	}
 
 	return 0;
 }
@@ -88,6 +92,18 @@ CURL* curlRequest(lua_State* L, curl_state* state, int optionsIndex, int progres
 	curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, state->errorBuffer);
 	curl_easy_setopt(curl, CURLOPT_USERAGENT, agent);
 
+	// check if the --insecure option was specified on the commandline.
+	lua_getglobal(L, "_OPTIONS");
+	lua_pushstring(L, "insecure");
+	lua_gettable(L, -2);
+	if (!lua_isnil(L, -1))
+	{
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
+		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
+	}
+	lua_pop(L, 2);
+
+	// apply all other options.
 	if (optionsIndex && lua_istable(L, optionsIndex))
 	{
 		lua_pushnil(L);

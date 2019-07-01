@@ -24,21 +24,34 @@
 	api.addAllowed("floatingpoint", "None")
 	api.addAllowed("flags", {
 		"CodeCoverage",
-		"Deprecated",
+		"Color",
 		"Documentation",
 		"GenerateHeader",
 		"GenerateJSON",
 		"GenerateMap",
-		"NoBoundsCheck",
---		"PIC",		// Note: this should be supported elsewhere...
+		"LowMem",
 		"Profile",
 		"Quiet",
---		"Release",	// Note: We infer this flag from config.isDebugBuild()
 		"RetainPaths",
-		"SeparateCompilation",
 		"SymbolsLikeC",
 		"UnitTest",
+		-- These are used by C++/D mixed $todo move them somewhere else? "flags2" "Dflags"?
+		-- [Code Generation Flags]
+		"UseLDC",
+		"ProfileGC",
+		"StackFrame",
+		"StackStomp",
+		"AllInstantiate",
+		"BetterC",
+		"Main",
+		"PerformSyntaxCheckOnly",
+		-- [Messages Flags]
+		"ShowCommandLine",
 		"Verbose",
+		"ShowTLS",
+		"ShowGC",
+		"IgnorePragma",
+		"ShowDependencies",
 	})
 
 
@@ -47,17 +60,53 @@
 --
 
 	api.register {
-		name = "versionconstants",
+		name = "boundscheck",
 		scope = "config",
-		kind = "list:string",
-		tokens = true,
+		kind = "string",
+		allowed = {
+			"Default",
+			"Off",
+			"On",
+			"SafeOnly",
+		},
 	}
 
 	api.register {
-		name = "versionlevel",
+		name = "compilationmodel",
 		scope = "config",
-		kind = "integer",
+		kind = "string",
+		allowed = {
+			"Default",
+			"File",
+			"Package",	-- TODO: this doesn't work with gmake!!
+			"Project",
+		},
 	}
+
+	api.register {
+		name = "checkaction",
+		scope = "config",
+		kind = "string",
+		allowed = {
+			"Default",
+			"D",
+			"C",
+			"Halt",
+			"Context",
+		},
+	}
+
+	api.register {
+		name = "computetargets",
+		scope = "config",
+		kind = "list:string",
+	}
+
+--	api.register {
+--		name = "debugcode",
+--		scope = "config",
+--		kind = "string",
+--	}
 
 	api.register {
 		name = "debugconstants",
@@ -70,6 +119,25 @@
 		name = "debuglevel",
 		scope = "config",
 		kind = "integer",
+	}
+
+	api.register {
+		name = "dependenciesfile",
+		scope = "config",
+		kind = "path",
+		tokens = true,
+	}
+
+	api.register {
+		name = "deprecatedfeatures",
+		scope = "config",
+		kind = "string",
+		allowed = {
+			"Default",
+			"Allow",
+			"Warn",
+			"Error",
+		},
 	}
 
 	api.register {
@@ -100,12 +168,85 @@
 		tokens = true,
 	}
 
+	api.register {
+		name = "jsonfile",
+		scope = "config",
+		kind = "path",
+		tokens = true,
+	}
+
+	api.register {
+		name = "importdirs",
+		scope = "config",
+		kind = "list:path",
+		tokens = true,
+	}
+
+	api.register {
+		name = "preview",
+		scope = "config",
+		kind = "list:string",
+		allowed = {
+			"dip25",
+			"dip1000",
+			"dip1008",
+			"fieldwise",
+			"markdown",
+			"fixAliasThis",
+			"intpromote",
+			"dtorfields",
+		},
+	}
+
+	api.register {
+		name = "revert",
+		scope = "config",
+		kind = "list:string",
+		allowed = {
+			"dip25",
+			"import",
+		},
+	}
+
+	api.register {
+		name = "stringimportdirs",
+		scope = "config",
+		kind = "list:path",
+		tokens = true,
+	}
+
+	api.register {
+		name = "transition",
+		scope = "config",
+		kind = "list:string",
+		allowed = {
+			"field",
+			"checkimports",
+			"complex",
+			"tls",
+			"vmarkdown",
+		},
+	}
+
+	api.register {
+		name = "versionconstants",
+		scope = "config",
+		kind = "list:string",
+		tokens = true,
+	}
+
+	api.register {
+		name = "versionlevel",
+		scope = "config",
+		kind = "integer",
+	}
 
 --
 -- Provide information for the help output
 --
 	newoption
 	{
+		category	= "compilers",
 		trigger		= "dc",
 		value		= "VALUE",
 		description	= "Choose a D compiler",
@@ -122,5 +263,5 @@
 --
 
 	return function (cfg)
-		return (cfg.language == p.D)
+		return (cfg.language == p.D or cfg.language == "C" or cfg.language == "C++")
 	end

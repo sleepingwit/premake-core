@@ -82,10 +82,11 @@
 
 	function includeexternal(fname)
 		local fullPath = p.findProjectScript(fname)
+		local wasIncludingExternal = api._isIncludingExternal
 		api._isIncludingExternal = true
 		fname = fullPath or fname
 		dofile(fname)
-		api._isIncludingExternal = nil
+		api._isIncludingExternal = wasIncludingExternal
 	end
 
 	p.alias(_G, "includeexternal", "includeExternal")
@@ -349,8 +350,10 @@
 			end
 		else
 			field.allowed = field.allowed or {}
-			table.insert(field.allowed, value)
-			field.allowed[value:lower()] = value
+			if field.allowed[value:lower()] == nil then
+				table.insert(field.allowed, value)
+				field.allowed[value:lower()] = value
+			end
 		end
 	end
 
@@ -672,10 +675,25 @@
 -- individual test runs.
 ---
 
+	local numBuiltInGlobalBlocks
+
 	function api.reset()
+		if numBuiltInGlobalBlocks == nil then
+			numBuiltInGlobalBlocks = #api.scope.global.blocks
+		end
+
 		for containerClass in p.container.eachChildClass(p.global) do
 			api.scope.global[containerClass.pluralName] = {}
 		end
+
+		api.scope.current = api.scope.global
+
+		local currentGlobalBlockCount = #api.scope.global.blocks
+		for i = currentGlobalBlockCount, numBuiltInGlobalBlocks, -1 do
+			table.remove(api.scope.global.blocks, i)
+		end
+
+		configset.addFilter(api.scope.current, {}, os.getcwd())
 	end
 
 
@@ -1046,10 +1064,7 @@
 	premake.field.kind("path", {
 		paths = true,
 		store = function(field, current, value, processor)
-			if string.sub(value, 1, 2) == "%{" then
-				return value
-			end
-			return path.getabsolute(value)
+			return path.deferredjoin(os.getcwd(), value)
 		end,
 		compare = function(field, a, b, processor)
 			return (a == b)

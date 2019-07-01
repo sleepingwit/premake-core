@@ -212,25 +212,69 @@
 
 	dmd.dflags = {
 		architecture = {
-			x86 = "-m32",
+			x86 = "-m32mscoff",
 			x86_64 = "-m64",
 		},
 		flags = {
-			CodeCoverage	= "-cov",
-			Deprecated		= "-d",
-			Documentation	= "-D",
-			FatalWarnings	= "-w",
-			GenerateHeader	= "-H",
-			GenerateJSON	= "-X",
-			GenerateMap		= "-map",
-			NoBoundsCheck	= "-noboundscheck",
-			Profile			= "-profile",
-			Quiet			= "-quiet",
---			Release			= "-release",
-			RetainPaths		= "-op",
-			SymbolsLikeC	= "-gc",
-			UnitTest		= "-unittest",
-			Verbose			= "-v",
+			OmitDefaultLibrary		= "-mscrtlib=",
+			CodeCoverage			= "-cov",
+			Color					= "-color",
+			Documentation			= "-D",
+			FatalWarnings			= "-w",
+			GenerateHeader			= "-H",
+			GenerateJSON			= "-X",
+			GenerateMap				= "-map",
+			LowMem					= "-lowmem",
+			Profile					= "-profile",
+			Quiet					= "-quiet",
+			RetainPaths				= "-op",
+			SymbolsLikeC			= "-gc",
+			UnitTest				= "-unittest",
+			Verbose					= "-v",
+			ProfileGC				= "-profile=gc",
+			StackFrame				= "-gs",
+			StackStomp				= "-gx",
+			AllInstantiate			= "-allinst",
+			BetterC					= "-betterC",
+			Main					= "-main",
+			PerformSyntaxCheckOnly	= "-o-",
+			ShowTLS					= "-vtls",
+			ShowGC					= "-vgc",
+			IgnorePragma			= "-ignore",
+			ShowDependencies		= "-deps",
+		},
+		boundscheck = {
+			Off = "-boundscheck=off",
+			On = "-boundscheck=on",
+			SafeOnly = "-boundscheck=safeonly",
+		},
+		checkaction = {
+			D = "-checkaction=D",
+			C = "-checkaction=C",
+			Halt = "-checkaction=halt",
+			Context = "-checkaction=context",
+		},
+		cppdialect = {
+			["C++latest"] = "-extern-std=c++17", -- TODO: keep this up to date >_<
+			["C++98"] = "-extern-std=c++98",
+			["C++0x"] = "-extern-std=c++11",
+			["C++11"] = "-extern-std=c++11",
+			["C++1y"] = "-extern-std=c++14",
+			["C++14"] = "-extern-std=c++14",
+			["C++1z"] = "-extern-std=c++17",
+			["C++17"] = "-extern-std=c++17",
+			["gnu++98"] = "-extern-std=c++98",
+			["gnu++0x"] = "-extern-std=c++11",
+			["gnu++11"] = "-extern-std=c++11",
+			["gnu++1y"] = "-extern-std=c++14",
+			["gnu++14"] = "-extern-std=c++14",
+			["gnu++1z"] = "-extern-std=c++17",
+			["gnu++17"] = "-extern-std=c++17",
+		},
+		deprecatedfeatures = {
+			Allow = "-d",
+			Warn = "-dw",
+			Error = "-de",
 		},
 		floatingpoint = {
 			None = "-nofloat",
@@ -244,13 +288,20 @@
 		pic = {
 			On = "-fPIC",
 		},
-		warnings = {
-			Default = "-wi",
-			Extra = "-wi",
-		},
 		symbols = {
 			On = "-g",
-		}
+			FastLink = "-g",
+			Full = "-g",
+		},
+		vectorextensions = {
+			AVX = "-mcpu=avx",
+			AVX2 = "-mcpu=avx2",
+		},
+		warnings = {
+			Default = "-wi",
+			High = "-wi",
+			Extra = "-wi",
+		},
 	}
 
 	function dmd.getdflags(cfg)
@@ -262,7 +313,30 @@
 			table.insert(flags, "-release")
 		end
 
-		-- TODO: When DMD gets CRT options, map StaticRuntime and DebugRuntime
+		if not cfg.flags.OmitDefaultLibrary then
+			local releaseruntime = not config.isDebugBuild(cfg)
+			local staticruntime = true
+			if cfg.staticruntime == "Off" then
+				staticruntime = false
+			end
+			if cfg.runtime == "Debug" then
+				releaseruntime = false
+			elseif cfg.runtime == "Release" then
+				releaseruntime = true
+			end
+
+			if (cfg.staticruntime and cfg.staticruntime ~= "Default") or (cfg.runtime and cfg.runtime ~= "Default") then
+				if staticruntime == true and releaseruntime == true then
+					table.insert(flags, "-mscrtlib=libcmt")
+				elseif staticruntime == true and releaseruntime == false then
+					table.insert(flags, "-mscrtlib=libcmtd")
+				elseif staticruntime == false and releaseruntime == true then
+					table.insert(flags, "-mscrtlib=msvcrt")
+				elseif staticruntime == false and releaseruntime == false then
+					table.insert(flags, "-mscrtlib=msvcrtd")
+				end
+			end
+		end
 
 		if cfg.flags.Documentation then
 			if cfg.docname then
@@ -278,6 +352,22 @@
 			end
 			if cfg.headerdir then
 				table.insert(flags, "-Hd" .. p.quoted(cfg.headerdir))
+			end
+		end
+
+		if #cfg.preview > 0 then
+			for _, opt in ipairs(cfg.preview) do
+				table.insert(flags, "-preview=" .. opt)
+			end
+		end
+		if #cfg.revert > 0 then
+			for _, opt in ipairs(cfg.revert) do
+				table.insert(flags, "-revert=" .. opt)
+			end
+		end
+		if #cfg.transition > 0 then
+			for _, opt in ipairs(cfg.transition) do
+				table.insert(flags, "-transition=" .. opt)
 			end
 		end
 
@@ -326,6 +416,20 @@
 		for _, dir in ipairs(dirs) do
 			dir = project.getrelative(cfg.project, dir)
 			table.insert(result, '-I' .. p.quoted(dir))
+		end
+		return result
+	end
+
+
+--
+-- Decorate string import file search paths for the DMD command line.
+--
+
+	function dmd.getstringimportdirs(cfg, dirs)
+		local result = {}
+		for _, dir in ipairs(dirs) do
+			dir = project.getrelative(cfg.project, dir)
+			table.insert(result, '-J' .. p.quoted(dir))
 		end
 		return result
 	end

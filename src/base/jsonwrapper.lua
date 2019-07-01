@@ -8,6 +8,7 @@
 
 	local implementation = dofile('json.lua')
 	local err
+	json.implementation = implementation
 
 	function implementation.assert(condition, message)
 		if not condition then
@@ -25,6 +26,18 @@
 		err = nil
 
 		local success, result = pcall(implementation.encode, implementation, value)
+
+		if not success then
+			return nil, err
+		end
+
+		return result
+	end
+
+	function json.encode_pretty(value)
+		err = nil
+
+		local success, result = pcall(implementation.encode_pretty, implementation, value)
 
 		if not success then
 			return nil, err

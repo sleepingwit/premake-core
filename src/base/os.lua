@@ -61,7 +61,7 @@
 		end
 		return dirs
 	end
-	
+
 	local function get_library_search_path()
 		local path
 		if os.istarget("windows") then
@@ -69,7 +69,7 @@
 		elseif os.istarget("haiku") then
 			path = os.getenv("LIBRARY_PATH") or ""
 		else
-			if os.istarget("macosx") then
+			if os.istarget("darwin") then
 				path = os.getenv("DYLD_LIBRARY_PATH") or ""
 			else
 				path = os.getenv("LD_LIBRARY_PATH") or ""
@@ -90,7 +90,7 @@
 
 			path = path or ""
 			local archpath = "/lib:/usr/lib:/usr/local/lib"
-			if os.is64bit() and not os.istarget("macosx") then
+			if os.is64bit() and not (os.istarget("darwin")) then
 				archpath = "/lib64:/usr/lib64/:usr/local/lib64" .. ":" .. archpath
 			end
 			if (#path > 0) then
@@ -116,7 +116,7 @@
 		elseif os.istarget("haiku") then
 			formats = { "lib%s.so", "%s.so" }
 		else
-			if os.istarget("macosx") then
+			if os.istarget("darwin") then
 				formats = { "lib%s.dylib", "%s.dylib" }
 			else
 				formats = { "lib%s.so", "%s.so" }
@@ -151,14 +151,14 @@
 	function os.findheader(headerpath, headerdirs)
 		-- headerpath: a partial header file path
 		-- headerdirs: additional header search paths
-		
+
 		local path = get_library_search_path()
-		
+
 		-- replace all /lib by /include
 		path = path .. ':'
-		path = path:gsub ('/lib[0-9]*([:/])', '/include%1') 
+		path = path:gsub ('/lib[0-9]*([:/])', '/include%1')
 		path = path:sub (1, #path - 1)
-		
+
 		local userpath = ""
 
 		if type(headerdirs) == "string" then
@@ -174,7 +174,7 @@
 				path = userpath
 			end
 		end
-		
+
 		local result = os.pathsearch (headerpath, path)
 		return result
 	end
@@ -222,7 +222,8 @@
 --
 
 	function os.istarget(id)
-		return (os.target():lower() == id:lower())
+		local tags = os.getSystemTags(os.target())
+		return table.contains(tags, id:lower())
 	end
 
 	function os.is(id)
@@ -237,7 +238,8 @@
 --
 
 	function os.ishost(id)
-		return (os.host():lower() == id:lower())
+		local tags = os.getSystemTags(os.host())
+		return table.contains(tags, id:lower())
 	end
 
 
@@ -460,17 +462,17 @@
 
 		local pipe = io.popen(cmd .. " 2>&1")
 		local result = pipe:read('*a')
-		local b, exitcode = pipe:close()
-		if not b then
-			exitcode = -1
-		end
+		local success, what, code = pipe:close()
+		if success then
+			-- chomp trailing newlines
+			if result then
+				result = string.gsub(result, "[\r\n]+$", "")
+			end
 
-		-- chomp trailing newlines
-		if result then
-			result = string.gsub(result, "[\r\n]+$", "")
+			return result, code, what
+		else
+			return nil, code, what
 		end
-
-		return result, exitcode
 	end
 
 
@@ -657,9 +659,18 @@
 
 
 ---
+-- Apply os slashes for decorated command paths.
+---
+	function os.translateCommandAndPath(dir, map)
+		if map == 'windows' then
+			return path.translate(dir)
+		end
+		return dir
+	end
+
+---
 -- Translate decorated command paths into their OS equivalents.
 ---
-
 	function os.translateCommandsAndPaths(cmds, basedir, location, map)
 		local translatedBaseDir = path.getrelative(location, basedir)
 
@@ -667,12 +678,10 @@
 
 		local translateFunction = function(value)
 			local result = path.join(translatedBaseDir, value)
-			if value:endswith('/') or value:endswith('\\') or
+			result = os.translateCommandAndPath(result, map)
+			if value:endswith('/') or value:endswith('\\') or -- if orginal path ends with a slash then ensure the same
 			   value:endswith('/"') or value:endswith('\\"') then
 				result = result .. '/'
-			end
-			if map == 'windows' then
-				result = path.translate(result)
 			end
 			return result
 		end
@@ -720,16 +729,18 @@
 -- Get a set of tags for different 'platforms'
 --
 
+	os.systemTags =
+	{
+		["aix"]      = { "aix",     "posix" },
+		["bsd"]      = { "bsd",     "posix" },
+		["haiku"]    = { "haiku",   "posix" },
+		["ios"]      = { "ios",     "darwin", "posix", "mobile" },
+		["linux"]    = { "linux",   "posix" },
+		["macosx"]   = { "macosx",  "darwin", "posix" },
+		["solaris"]  = { "solaris", "posix" },
+		["windows"]  = { "windows", "win32" },
+	}
+
 	function os.getSystemTags(name)
-		local tags =
-		{
-			["aix"]      = { "aix",     "posix" },
-			["bsd"]      = { "bsd",     "posix" },
-			["haiku"]    = { "haiku",   "posix" },
-			["linux"]    = { "linux",   "posix" },
-			["macosx"]   = { "macosx",  "darwin", "posix" },
-			["solaris"]  = { "solaris", "posix" },
-			["windows"]  = { "windows", "win32" },
-		}
-		return tags[name] or name
+		return os.systemTags[name:lower()] or { name:lower() }
 	end

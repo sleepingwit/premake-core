@@ -124,7 +124,6 @@
 			end,
 			-- source files are handled at the leaves
 			onleaf = function(node, depth)
-
 				local excludesFromBuild = {}
 				for cfg in project.eachconfig(prj) do
 					local cfgname = codelite.cfgname(cfg)
@@ -140,7 +139,7 @@
 					_p(depth, '<File Name="%s"/>', node.relpath)
 				end
 			end,
-		}, false, 1)
+		}, true)
 	end
 
 	function m.dependencies(prj)
@@ -197,8 +196,9 @@
 		end
 
 		local toolset = m.getcompiler(cfg)
-		local cxxflags = table.concat(table.join(toolset.getcxxflags(cfg), cfg.buildoptions), ";")
-		local cflags   = table.concat(table.join(toolset.getcflags(cfg), cfg.buildoptions), ";")
+		local forceincludes = toolset.getforceincludes(cfg)
+		local cxxflags = table.concat(table.join(toolset.getcxxflags(cfg), forceincludes, cfg.buildoptions), ";")
+		local cflags   = table.concat(table.join(toolset.getcflags(cfg), forceincludes, cfg.buildoptions), ";")
 		local asmflags = ""
 		local pch      = ""
 
@@ -208,7 +208,7 @@
 			_x(4, '<IncludePath Value="%s"/>', project.getrelative(cfg.project, includedir))
 		end
 		for _, define in ipairs(cfg.defines) do
-			_x(4, '<Preprocessor Value="%s"/>', p.esc(define))
+			_p(4, '<Preprocessor Value="%s"/>', p.esc(define):gsub(' ', '\\ '))
 		end
 		_p(3, '</Compiler>')
 	end
@@ -224,6 +224,9 @@
 
 		_x(3, '<Linker Required="yes" Options="%s">', table.concat(flags, ";"))
 
+		for _, libdir in ipairs(cfg.libdirs) do
+			_p(4, '<LibraryPath Value="%s"/>', project.getrelative(cfg.project, libdir))
+		end
 		_p(3, '</Linker>')
 	end
 
@@ -265,15 +268,27 @@
 		local pauseexec  = iif(prj.kind == "ConsoleApp", "yes", "no")
 		local isguiprogram = iif(prj.kind == "WindowedApp", "yes", "no")
 		local isenabled  = iif(cfg.flags.ExcludeFromBuild, "no", "yes")
+		local ldPath = ''
 
-		_x(3, '<General OutputFile="%s" IntermediateDirectory="%s" Command="%s" CommandArguments="%s" UseSeparateDebugArgs="%s" DebugArguments="%s" WorkingDirectory="%s" PauseExecWhenProcTerminates="%s" IsGUIProgram="%s" IsEnabled="%s"/>',
-			targetname, objdir, command, cmdargs, useseparatedebugargs, debugargs, workingdir, pauseexec, isguiprogram, isenabled)
+		for _, libdir in ipairs(cfg.libdirs) do
+			ldPath = ldPath .. ":" .. project.getrelative(cfg.project, libdir)
+		end
+
+		if ldPath == nil or ldPath == '' then
+			_x(3, '<General OutputFile="%s" IntermediateDirectory="%s" Command="%s" CommandArguments="%s" UseSeparateDebugArgs="%s" DebugArguments="%s" WorkingDirectory="%s" PauseExecWhenProcTerminates="%s" IsGUIProgram="%s" IsEnabled="%s"/>',
+				targetname, objdir, command, cmdargs, useseparatedebugargs, debugargs, workingdir, pauseexec, isguiprogram, isenabled)
+		else
+			ldPath = string.sub(ldPath, 2)
+			_x(3, '<General OutputFile="%s" IntermediateDirectory="%s" Command="LD_LIBRARY_PATH=%s %s" CommandArguments="%s" UseSeparateDebugArgs="%s" DebugArguments="%s" WorkingDirectory="%s" PauseExecWhenProcTerminates="%s" IsGUIProgram="%s" IsEnabled="%s"/>',
+ 				targetname, objdir, ldPath, command, cmdargs, useseparatedebugargs, debugargs, workingdir, pauseexec, isguiprogram, isenabled)
+		end
 	end
 
 	function m.environment(cfg)
+		local envs = table.concat(cfg.debugenvs, "\n")
+
 		_p(3, '<Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">')
-		local variables = ""
-		_x(4, '<![CDATA[%s]]>', variables)
+		_p(4, '<![CDATA[%s]]>', envs)
 		_p(3, '</Environment>')
 	end
 
@@ -281,17 +296,23 @@
 
 		_p(3, '<Debugger IsRemote="%s" RemoteHostName="%s" RemoteHostPort="%s" DebuggerPath="" IsExtended="%s">', iif(cfg.debugremotehost, "yes", "no"), cfg.debugremotehost or "", iif(cfg.debugport, tostring(cfg.debugport), ""), iif(cfg.debugextendedprotocol, "yes", "no"))
 		if #cfg.debugsearchpaths > 0 then
+			p.escaper(codelite.escElementText)
 			_p(4, '<DebuggerSearchPaths>%s</DebuggerSearchPaths>', table.concat(p.esc(project.getrelative(cfg.project, cfg.debugsearchpaths)), "\n"))
+			p.escaper(codelite.esc)
 		else
 			_p(4, '<DebuggerSearchPaths/>')
 		end
 		if #cfg.debugconnectcommands > 0 then
+			p.escaper(codelite.escElementText)
 			_p(4, '<PostConnectCommands>%s</PostConnectCommands>', table.concat(p.esc(cfg.debugconnectcommands), "\n"))
+			p.escaper(codelite.esc)
 		else
 			_p(4, '<PostConnectCommands/>')
 		end
 		if #cfg.debugstartupcommands > 0 then
+			p.escaper(codelite.escElementText)
 			_p(4, '<StartupCommands>%s</StartupCommands>', table.concat(p.esc(cfg.debugstartupcommands), "\n"))
+			p.escaper(codelite.esc)
 		else
 			_p(4, '<StartupCommands/>')
 		end
@@ -301,10 +322,12 @@
 	function m.preBuild(cfg)
 		if #cfg.prebuildcommands > 0 then
 			_p(3, '<PreBuild>')
-			for _, commands in ipairs(cfg.prebuildcommands) do
-				_x(4, '<Command Enabled="yes">%s</Command>',
-				p.esc(commands))
+			local commands = os.translateCommandsAndPaths(cfg.prebuildcommands, cfg.project.basedir, cfg.project.location)
+			p.escaper(codelite.escElementText)
+			for _, command in ipairs(commands) do
+				_x(4, '<Command Enabled="yes">%s</Command>', command)
 			end
+			p.escaper(codelite.esc)
 			_p(3, '</PreBuild>')
 		end
 	end
@@ -312,10 +335,12 @@
 	function m.postBuild(cfg)
 		if #cfg.postbuildcommands > 0 then
 			_p(3, '<PostBuild>')
-			for _, commands in ipairs(cfg.postbuildcommands) do
-				_x(4, '<Command Enabled="yes">%s</Command>',
-				p.esc(commands))
+			local commands = os.translateCommandsAndPaths(cfg.postbuildcommands, cfg.project.basedir, cfg.project.location)
+			p.escaper(codelite.escElementText)
+			for _, command in ipairs(commands) do
+				_x(4, '<Command Enabled="yes">%s</Command>', command)
 			end
+			p.escaper(codelite.esc)
 			_p(3, '</PostBuild>')
 		end
 	end
@@ -355,11 +380,11 @@
 	end
 
 	function m.isCpp11(cfg)
-		return (cfg.cppdialect == 'gnu++11') or (cfg.cppdialect == 'C++11')
+		return (cfg.cppdialect == 'gnu++11') or (cfg.cppdialect == 'C++11') or (cfg.cppdialect == 'gnu++0x') or (cfg.cppdialect == 'C++0x')
 	end
 
 	function m.isCpp14(cfg)
-		return (cfg.cppdialect == 'gnu++14') or (cfg.cppdialect == 'C++14')
+		return (cfg.cppdialect == 'gnu++14') or (cfg.cppdialect == 'C++14') or (cfg.cppdialect == 'gnu++1y') or (cfg.cppdialect == 'C++1y')
 	end
 
 	function m.completion(cfg)

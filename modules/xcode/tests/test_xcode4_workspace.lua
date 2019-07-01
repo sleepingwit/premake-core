@@ -18,7 +18,8 @@
 	local wks, prj
 
 	function suite.setup()
-		_ACTION = "xcode4"
+		_TARGET_OS = "macosx"
+		p.action.set('xcode4')
 		wks = test.createWorkspace()
 	end
 
@@ -70,6 +71,28 @@
 	</FileRef>
 	<FileRef
 		location = "group:MyProject2.xcodeproj">
+	</FileRef>
+</Workspace>
+		]]
+	end
+
+	function suite.onMultipleProjectsGrouped()
+		test.createGroup(wks)
+		test.createproject(wks)
+		prepare()
+		test.capture [[
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+	version = "1.0">
+	<Group
+		location = "container:"
+		name = "MyGroup1">
+		<FileRef
+			location = "group:MyProject2.xcodeproj">
+		</FileRef>
+	</Group>
+	<FileRef
+		location = "group:MyProject.xcodeproj">
 	</FileRef>
 </Workspace>
 		]]

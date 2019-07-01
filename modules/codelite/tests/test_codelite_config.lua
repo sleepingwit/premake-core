@@ -17,11 +17,13 @@
 
 	function suite.setup()
 		p.action.set("codelite")
+		p.escaper(codelite.esc)
 		p.indent("  ")
-		wks, prj = test.createWorkspace()
+		wks = test.createWorkspace()
 	end
 
 	local function prepare()
+		prj = test.getproject(wks,1)
 		cfg = test.getconfig(prj, "Debug")
 	end
 
@@ -44,11 +46,12 @@
 		language "C++"
 		cppdialect "C++11"
 		flags { "NoBufferSecurityCheck" }
+		forceincludes { "forced_include1.h", "forced_include2.h" }
 		buildoptions { "-opt1", "-opt2" }
 		prepare()
 		codelite.project.compiler(cfg)
 		test.capture [[
-      <Compiler Options="-O0;-fPIC;-g;-std=c++11;-fno-exceptions;-fno-stack-protector;-fno-rtti;-opt1;-opt2" C_Options="-O0;-fPIC;-g;-opt1;-opt2" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" UseDifferentPCHFlags="no" PCHFlags="">
+      <Compiler Options="-O0;-fPIC;-g;-std=c++11;-fno-exceptions;-fno-stack-protector;-fno-rtti;-include forced_include1.h;-include forced_include2.h;-opt1;-opt2" C_Options="-O0;-fPIC;-g;-include forced_include1.h;-include forced_include2.h;-opt1;-opt2" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" UseDifferentPCHFlags="no" PCHFlags="">
       </Compiler>
 		]]
 	end
@@ -66,13 +69,15 @@
 	end
 
 	function suite.OnProjectCfg_Defines()
-		defines { "TEST", "DEF" }
+		defines { "TEST", "DEF", "VAL=1", "ESCAPE=\"WITH SPACE\"" }
 		prepare()
 		codelite.project.compiler(cfg)
 		test.capture [[
       <Compiler Options="" C_Options="" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" UseDifferentPCHFlags="no" PCHFlags="">
         <Preprocessor Value="TEST"/>
         <Preprocessor Value="DEF"/>
+        <Preprocessor Value="VAL=1"/>
+        <Preprocessor Value="ESCAPE=\&quot;WITH\ SPACE\&quot;"/>
       </Compiler>
 		]]
 	end
@@ -92,6 +97,8 @@
 		codelite.project.linker(cfg)
 		test.capture [[
       <Linker Required="yes" Options="">
+        <LibraryPath Value="test"/>
+        <LibraryPath Value="test2"/>
       </Linker>
 		]]
 	end
@@ -139,11 +146,24 @@
 	end
 
 	function suite.OnProjectCfg_Environment()
+		debugenvs { "ENV_ONE=1", "ENV_TWO=2" }
 		prepare()
 		codelite.project.environment(cfg)
 		test.capture(
 '      <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">\n' ..
-'        <![CDATA[]]>\n' ..
+'        <![CDATA[ENV_ONE=1\n' ..
+'ENV_TWO=2]]>\n' ..
+'      </Environment>'
+		)
+	end
+
+	function suite.OnProjectCfg_EnvironmentEscaping()
+		debugenvs { "\"ENV\"=<&>" }
+		prepare()
+		codelite.project.environment(cfg)
+		test.capture(
+'      <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">\n' ..
+'        <![CDATA["ENV"=<&>]]>\n' ..
 '      </Environment>'
 		)
 	end
@@ -181,7 +201,25 @@ cmd2</StartupCommands>
 		]]
 	end
 
-	function suite.OnProject_PreBuild()
+	function suite.OnProjectCfg_DebuggerOptsEscaping()
+		debugremotehost "localhost"
+		debugport(2345)
+		debugextendedprotocol(true)
+		debugsearchpaths { "\"search\" && <path>" }
+		debugconnectcommands { "\"connect\" && <cmd>" }
+		debugstartupcommands { "\"start\" && <cmd>" }
+		prepare()
+		codelite.project.debugger(cfg)
+		test.capture [[
+      <Debugger IsRemote="yes" RemoteHostName="localhost" RemoteHostPort="2345" DebuggerPath="" IsExtended="yes">
+        <DebuggerSearchPaths>"search" &amp;&amp; &lt;path&gt;</DebuggerSearchPaths>
+        <PostConnectCommands>"connect" &amp;&amp; &lt;cmd&gt;</PostConnectCommands>
+        <StartupCommands>"start" &amp;&amp; &lt;cmd&gt;</StartupCommands>
+      </Debugger>
+		]]
+	end
+
+	function suite.OnProjectCfg_PreBuild()
 		prebuildcommands { "cmd0", "cmd1" }
 		prepare()
 		codelite.project.preBuild(prj)
@@ -193,7 +231,22 @@ cmd2</StartupCommands>
 		]]
 	end
 
-	function suite.OnProject_PreBuild()
+	function suite.OnProjectCfg_PreBuild_Escaped()
+		prebuildcommands {
+			"touch \"./build/copyright\" && echo OK",
+			"cat \"./lib/copyright\" >> \"./build/copyright\""
+		}
+		prepare()
+		codelite.project.preBuild(prj)
+		test.capture [[
+      <PreBuild>
+        <Command Enabled="yes">touch "./build/copyright" &amp;&amp; echo OK</Command>
+        <Command Enabled="yes">cat "./lib/copyright" &gt;&gt; "./build/copyright"</Command>
+      </PreBuild>
+		]]
+	end
+
+	function suite.OnProjectCfg_PostBuild()
 		postbuildcommands { "cmd0", "cmd1" }
 		prepare()
 		codelite.project.postBuild(prj)
@@ -205,10 +258,25 @@ cmd2</StartupCommands>
 		]]
 	end
 
+	function suite.OnProjectCfg_PostBuild_Escaped()
+		postbuildcommands {
+			"touch \"./build/copyright\" && echo OK",
+			"cat \"./lib/copyright\" >> \"./build/copyright\""
+		}
+		prepare()
+		codelite.project.postBuild(prj)
+		test.capture [[
+      <PostBuild>
+        <Command Enabled="yes">touch "./build/copyright" &amp;&amp; echo OK</Command>
+        <Command Enabled="yes">cat "./lib/copyright" &gt;&gt; "./build/copyright"</Command>
+      </PostBuild>
+		]]
+	end
+
 	-- TODO: test custom build
 
 
-	function suite.OnProject_AdditionalRules()
+	function suite.OnProjectCfg_AdditionalRules()
 		prepare()
 		codelite.project.additionalRules(prj)
 		test.capture [[
@@ -219,7 +287,7 @@ cmd2</StartupCommands>
 		]]
 	end
 
-	function suite.OnProject_Completion()
+	function suite.OnProjectCfg_Completion()
 		language "C++"
 		cppdialect "C++11"
 		prepare()
@@ -231,5 +299,26 @@ cmd2</StartupCommands>
         <ClangPP/>
         <SearchPaths/>
       </Completion>
+		]]
+	end
+
+	function suite.OnProjectCfg_UnsignedCharOn()
+		unsignedchar "On"
+		prepare()
+		codelite.project.compiler(cfg)
+		test.capture [[
+      <Compiler Options="-funsigned-char" C_Options="-funsigned-char" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" UseDifferentPCHFlags="no" PCHFlags="">
+      </Compiler>
+		]]
+	end
+
+
+	function suite.OnProjectCfg_UnsignedCharOff()
+		unsignedchar "Off"
+		prepare()
+		codelite.project.compiler(cfg)
+		test.capture [[
+      <Compiler Options="-fno-unsigned-char" C_Options="-fno-unsigned-char" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" UseDifferentPCHFlags="no" PCHFlags="">
+      </Compiler>
 		]]
 	end

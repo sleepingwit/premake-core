@@ -48,9 +48,9 @@
 		local bundlename = ""
 		local bundlepath = ""
 
-		if cfg.system == p.MACOSX and kind == p.WINDOWEDAPP then
-			bundlename = basename .. ".app"
-			bundlepath = path.join(bundlename, "Contents/MacOS")
+		if table.contains(os.getSystemTags(cfg.system), "darwin") and (kind == p.WINDOWEDAPP or (kind == p.SHAREDLIB and cfg.sharedlibtype)) then
+			bundlename = basename .. extension
+			bundlepath = path.join(bundlename, iif(kind == p.SHAREDLIB and cfg.sharedlibtype == "OSXFramework", "Versions/A", "Contents/MacOS"))
 		end
 
 		local info = {}
@@ -97,6 +97,19 @@
 
 			if target.kind ~= "SharedLib" and target.kind ~= "StaticLib" then
 				return false
+			end
+
+			-- Can link mixed C++ with native projects
+
+			if cfg.language == "C++" then
+				if cfg.clr == p.ON then
+					return true
+				end
+			end
+			if target.language == "C++" then
+				if target.clr == p.ON then
+					return true
+				end
 			end
 
 			-- Can't link managed and unmanaged projects
@@ -326,7 +339,12 @@
 --
 
 	function config.getruntime(cfg)
-		local linkage = iif(cfg.flags.StaticRuntime, "Static", "Shared")
+		if (not cfg.staticruntime or cfg.staticruntime == "Default") and not cfg.runtime then
+			return nil -- indicate that no runtime was explicitly selected
+		end
+
+		local linkage = iif(cfg.staticruntime == "On", "Static", "Shared") -- assume 'Shared' is default?
+
 		if not cfg.runtime then
 			return linkage .. iif(config.isDebugBuild(cfg), "Debug", "Release")
 		else
@@ -487,6 +505,9 @@
 
 		for field in p.field.eachOrdered() do
 			local map = mappings[field.name]
+			if type(map) == "function" then
+				map = map(cfg, mappings)
+			end
 			if map then
 
 				-- Pass each cfg value in the list through the map and append the

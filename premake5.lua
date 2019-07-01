@@ -73,6 +73,11 @@
 		trigger = "no-zlib",
 		description = "Disable Zlib/Zip 3rd party lib"
 	}
+	
+	newoption {
+		trigger = "no-luasocket",
+		description = "Disable Luasocket 3rd party lib"
+	}
 
 	newoption {
 		trigger     = "bytecode",
@@ -94,15 +99,19 @@
 		configurations { "Release", "Debug" }
 		location ( _OPTIONS["to"] )
 
-		flags { "No64BitChecks", "StaticRuntime", "MultiProcessorCompile" }
+		flags { "StaticRuntime", "MultiProcessorCompile" }
 		warnings "Extra"
 
 		if not _OPTIONS["no-zlib"] then
 			defines { "PREMAKE_COMPRESSION" }
 		end
+		
 		if not _OPTIONS["no-curl"] then
 			defines { "CURL_STATICLIB", "PREMAKE_CURL"}
 		end
+
+		filter { 'system:windows' }
+			platforms   { 'x86', 'x64' }
 
 		filter "configurations:Debug"
 			defines     "_DEBUG"
@@ -119,15 +128,11 @@
 		filter { "system:windows", "configurations:Release" }
 			flags       { "NoIncrementalLink", "LinkTimeOptimization" }
 
-		filter { "system:macosx", "action:gmake" }
-			buildoptions { "-mmacosx-version-min=10.4" }
-			linkoptions  { "-mmacosx-version-min=10.4" }
-
 	project "Premake5"
 		targetname  "premake5"
 		language    "C"
 		kind        "ConsoleApp"
-		includedirs { "contrib/lua/src" }
+		includedirs { "contrib/lua/src", "contrib/luashim" }
 		links       { "lua-lib" }
 
 		-- optional 3rd party libraries
@@ -135,6 +140,7 @@
 			includedirs { "contrib/zlib", "contrib/libzip" }
 			links { "zip-lib", "zlib-lib" }
 		end
+		
 		if not _OPTIONS["no-curl"] then
 			includedirs { "contrib/curl/include" }
 			links { "curl-lib" }
@@ -144,17 +150,19 @@
 		{
 			"*.txt", "**.lua",
 			"src/**.h", "src/**.c",
+			"modules/**"
 		}
 
 		excludes
 		{
-			"contrib/**.*"
+			"contrib/**.*",
+			"binmodules/**.*"
 		}
 
 		filter "configurations:Debug"
 			targetdir   "bin/debug"
-			debugargs   { "--scripts=%{prj.location}/%{path.getrelative(prj.location, prj.basedir)} test"}
-			debugdir    "%{path.getrelative(prj.location, prj.basedir)}"
+			debugargs   { "--scripts=%{prj.location}/%{path.getrelative(prj.location, prj.basedir)}", "test" }
+			debugdir    "."
 
 		filter "configurations:Release"
 			targetdir   "bin/release"
@@ -177,13 +185,13 @@
 
 		filter "system:macosx"
 			defines     { "LUA_USE_MACOSX" }
-			links       { "CoreServices.framework", "Foundation.framework", "Security.framework" }
+			links       { "CoreServices.framework", "Foundation.framework", "Security.framework", "readline" }
 
 		filter { "system:macosx", "action:gmake" }
 			toolset "clang"
 
 		filter { "system:solaris" }
-			linkoptions { "-Wl,--export-dynamic" }
+			links       { "m", "socket", "nsl" }
 
 		filter "system:aix"
 			defines     { "LUA_USE_POSIX", "LUA_USE_DLOPEN" }
@@ -193,13 +201,23 @@
 	-- optional 3rd party libraries
 	group "contrib"
 		include "contrib/lua"
+		include "contrib/luashim"
+		
 		if not _OPTIONS["no-zlib"] then
 			include "contrib/zlib"
 			include "contrib/libzip"
 		end
+		
 		if not _OPTIONS["no-curl"] then
 			include "contrib/mbedtls"
 			include "contrib/curl"
+		end		
+
+	group "Binary Modules"
+		include "binmodules/example"
+		
+		if not _OPTIONS["no-luasocket"] then
+			include "binmodules/luasocket"
 		end
 
 --
